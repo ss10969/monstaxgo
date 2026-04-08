@@ -28,9 +28,8 @@ const product = {
   image:
     "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80",
   description:
-    "同一個商品頁內可直接選版本與通路，系統會自動帶出對應價格，再選數量加入購物車。",
+    "同一個商品頁內可直接選版本與通路，系統會自動帶出對應價格，再選擇數量加入購物車。",
   versions: ["Digipack Ver. 個人封", "Heartbreak", "Thirst", "Alive", "Heal"],
-  channels: ["Barnes & Noble", "POP-UP", "Target", "Walmart", "hello82", "簽專"],
   pricing: {
     "Digipack Ver. 個人封": {
       "Barnes & Noble": 810,
@@ -94,7 +93,7 @@ const sampleOrders = [
       {
         name: "單色腮紅代購頁",
         version: "文字腮紅",
-        spec: "29 Dusty Mauve",
+        channel: "Barnes & Noble",
         quantity: 2,
         price: 149,
       },
@@ -115,7 +114,7 @@ const sampleOrders = [
       {
         name: "單色腮紅代購頁",
         version: "小熊聯名腮紅",
-        spec: "34 Mango",
+        channel: "POP-UP",
         quantity: 3,
         price: 149,
       },
@@ -136,7 +135,7 @@ const statusClasses = {
 
 export default function GroupOrderStore() {
   const [selectedVersion, setSelectedVersion] = useState("");
-  const [selectedChannel, setSelectedChannel] = useSt
+  const [selectedChannel, setSelectedChannel] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState([]);
   const [page, setPage] = useState("product");
@@ -173,6 +172,16 @@ export default function GroupOrderStore() {
     return () => window.removeEventListener("hashchange", syncRoute);
   }, []);
 
+  const availableChannels = useMemo(() => {
+    if (!selectedVersion) return [];
+    return Object.keys(product.pricing[selectedVersion] || {});
+  }, [selectedVersion]);
+
+  const selectedPrice = useMemo(() => {
+    if (!selectedVersion || !selectedChannel) return 0;
+    return product.pricing[selectedVersion]?.[selectedChannel] || 0;
+  }, [selectedVersion, selectedChannel]);
+
   const cartSubtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
@@ -195,7 +204,7 @@ export default function GroupOrderStore() {
         order.status,
         order.paymentStatus,
         order.shippingStatus,
-        ...order.items.map((item) => `${item.name} ${item.version} ${item.spec}`),
+        ...order.items.map((item) => `${item.name} ${item.version} ${item.channel}`),
       ]
         .join(" ")
         .toLowerCase();
@@ -214,9 +223,9 @@ export default function GroupOrderStore() {
   }, [submittedOrders]);
 
   const addToCart = () => {
-    if (!selectedVersion || !selectedSpec || quantity < 1) return;
+    if (!selectedVersion || !selectedChannel || quantity < 1) return;
 
-    const cartKey = `${selectedVersion}-${selectedSpec}`;
+    const cartKey = `${selectedVersion}-${selectedChannel}`;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.cartKey === cartKey);
@@ -233,9 +242,9 @@ export default function GroupOrderStore() {
           productId: product.id,
           name: product.name,
           version: selectedVersion,
-          spec: selectedSpec,
+          channel: selectedChannel,
           quantity,
-          price: product.price,
+          price: selectedPrice,
         },
       ];
     });
@@ -287,7 +296,7 @@ export default function GroupOrderStore() {
       items: cart.map((item) => ({
         name: item.name,
         version: item.version,
-        spec: item.spec,
+        channel: item.channel,
         quantity: item.quantity,
         price: item.price,
       })),
@@ -339,7 +348,7 @@ export default function GroupOrderStore() {
               </div>
               <h1 className="text-3xl font-bold tracking-tight">專輯 / 美妝代購網站原型</h1>
               <p className="mt-2 text-sm text-neutral-500">
-                商品頁可以選版本、規格、數量並加入購物車，購物車頁可查看總金額並填寫完整訂單資料。
+                商品頁可以選版本、通路、數量並加入購物車，購物車頁可查看總金額並填寫完整訂單資料。
               </p>
             </div>
 
@@ -387,8 +396,10 @@ export default function GroupOrderStore() {
                   </div>
 
                   <div className="rounded-3xl bg-neutral-50 p-5">
-                    <div className="text-sm text-neutral-500">單件價格</div>
-                    <div className="mt-2 text-5xl font-bold text-rose-600">NT${product.price}</div>
+                    <div className="text-sm text-neutral-500">目前價格</div>
+                    <div className="mt-2 text-5xl font-bold text-rose-600">
+                      {selectedPrice ? `NT$${selectedPrice}` : "請先選版本與通路"}
+                    </div>
                   </div>
 
                   <div className="space-y-5">
@@ -409,15 +420,15 @@ export default function GroupOrderStore() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-base font-semibold">規格</Label>
-                      <Select value={selectedSpec} onValueChange={setSelectedSpec}>
+                      <Label className="text-base font-semibold">通路</Label>
+                      <Select value={selectedChannel} onValueChange={setSelectedChannel} disabled={!selectedVersion}>
                         <SelectTrigger className="h-12 rounded-2xl">
-                          <SelectValue placeholder="請選擇規格" />
+                          <SelectValue placeholder={selectedVersion ? "請選擇通路" : "請先選擇版本"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {product.specs.map((spec) => (
-                            <SelectItem key={spec} value={spec}>
-                              {spec}
+                          {availableChannels.map((channel) => (
+                            <SelectItem key={channel} value={channel}>
+                              {channel} ・ NT${product.pricing[selectedVersion]?.[channel]}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -455,10 +466,10 @@ export default function GroupOrderStore() {
                     </div>
                     <div className="mt-3 space-y-1">
                       <div className="text-sm">版本：{selectedVersion || "尚未選擇"}</div>
-                      <div className="text-sm">規格：{selectedSpec || "尚未選擇"}</div>
+                      <div className="text-sm">通路：{selectedChannel || "尚未選擇"}</div>
                       <div className="text-sm">數量：{quantity}</div>
                     </div>
-                    <div className="mt-4 text-xl font-bold">小計：NT${product.price * quantity}</div>
+                    <div className="mt-4 text-xl font-bold">小計：NT${selectedPrice * quantity}</div>
                   </div>
 
                   <Button className="h-12 w-full rounded-2xl text-base" onClick={addToCart}>
@@ -481,7 +492,7 @@ export default function GroupOrderStore() {
                   <CardContent className="space-y-4">
                     {cart.length === 0 ? (
                       <div className="rounded-2xl border border-dashed p-10 text-center text-neutral-500">
-                        目前購物車是空的，先回商品頁選擇版本與規格吧。
+                        目前購物車是空的，先回商品頁選擇版本與通路吧。
                       </div>
                     ) : (
                       cart.map((item) => (
@@ -490,7 +501,7 @@ export default function GroupOrderStore() {
                             <div className="space-y-1">
                               <div className="text-lg font-semibold">{item.name}</div>
                               <div className="text-sm text-neutral-500">版本：{item.version}</div>
-                              <div className="text-sm text-neutral-500">規格：{item.spec}</div>
+                              <div className="text-sm text-neutral-500">通路：{item.channel}</div>
                               <div className="text-sm text-neutral-500">單價：NT${item.price}</div>
                             </div>
 
@@ -692,7 +703,7 @@ export default function GroupOrderStore() {
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                     <Input
                       className="pl-9"
-                      placeholder="搜尋訂單編號、社群名稱、規格、email"
+                      placeholder="搜尋訂單編號、社群名稱、通路、email"
                       value={adminSearch}
                       onChange={(e) => setAdminSearch(e.target.value)}
                     />
@@ -737,7 +748,7 @@ export default function GroupOrderStore() {
                             <div key={`${order.id}-${index}`} className="rounded-2xl bg-neutral-50 p-4">
                               <div className="font-semibold">{item.name}</div>
                               <div className="mt-1 text-sm text-neutral-500">版本：{item.version}</div>
-                              <div className="text-sm text-neutral-500">規格：{item.spec}</div>
+                              <div className="text-sm text-neutral-500">通路：{item.channel}</div>
                               <div className="text-sm text-neutral-500">數量：{item.quantity}</div>
                               <div className="mt-1 text-sm text-neutral-500">單價：NT${item.price}</div>
                             </div>
